@@ -1,0 +1,7 @@
+{
+  "name": "rokid-color-colorsnap",
+  "version": "1.0.0",
+  "description": "奇光 ColorSnap — Rokid Color 双目全彩 AI 内容社交智能体（AIUI）",
+  "main": "app.js",
+  "dependencies": {}
+}

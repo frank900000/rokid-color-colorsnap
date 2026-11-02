@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>奇光 ColorSnap · Rokid Color 全彩 AI 内容社交</title>
+<style>
+  :root{
+    --bg:#0b0b14; --panel:rgba(255,255,255,.06); --panel-2:rgba(255,255,255,.10);
+    --txt:#f4f4fb; --sub:#a9a9c4; --line:rgba(255,255,255,.12);
+    --c1:#7c5cff; --c2:#ff5ca8; --c3:#2de2e6; --c4:#ffd166; --ok:#3ddc97;
+    --radius:22px; --shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:radial-gradient(1200px 800px at 70% -10%,#241a4d 0%,#0b0b14 55%);color:var(--txt);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  .stage{display:flex;align-items:center;justify-content:center;min-height:100%;padding:24px;}
+  /* 眼镜 HUD 手机框 */
+  .device{width:390px;height:844px;border-radius:46px;background:linear-gradient(160deg,#15152a,#0c0c18);
+    border:1px solid var(--line);box-shadow:var(--shadow);position:relative;overflow:hidden;display:flex;flex-direction:column;}
+  .notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#000;border-radius:16px;z-index:30;}
+  .brandbar{display:flex;align-items:center;justify-content:space-between;padding:40px 20px 12px;z-index:10;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:.5px;}
+  .logo{width:30px;height:30px;border-radius:9px;background:conic-gradient(from 0deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c1));box-shadow:0 0 18px rgba(124,92,255,.6);}
+  .badge{font-size:11px;color:#0b0b14;background:linear-gradient(90deg,var(--c4),var(--c2));padding:3px 9px;border-radius:20px;font-weight:800;}
+  .tabbar{display:flex;gap:6px;padding:0 14px 6px;}
+  .tab{flex:1;text-align:center;padding:9px 0;border-radius:14px;font-size:13px;color:var(--sub);background:var(--panel);border:1px solid transparent;}
+  .tab.active{color:#fff;background:var(--panel-2);border-color:var(--line);font-weight:700;}
+  .view{flex:1;overflow:hidden;position:relative;}
+  .page{position:absolute;inset:0;padding:14px;overflow-y:auto;display:none;}
+  .page.active{display:block;}
+  .page::-webkit-scrollbar{display:none}
+
+  /* 通用卡片/标题 */
+  h2{font-size:17px;margin:4px 2px 12px;font-weight:800}
+  .muted{color:var(--sub);font-size:12px}
+
+  /* 发现页 */
+  .feed{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .shot{aspect-ratio:3/4;border-radius:18px;overflow:hidden;position:relative;border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .shot .cap{position:absolute;left:8px;right:8px;bottom:8px;font-size:11px;font-weight:700;text-shadow:0 1px 4px #000}
+  .shot .like{position:absolute;top:8px;right:8px;font-size:11px;background:rgba(0,0,0,.4);padding:3px 7px;border-radius:20px}
+  .g1{background:linear-gradient(135deg,#7c5cff,#ff5ca8)}
+  .g2{background:linear-gradient(135deg,#2de2e6,#7c5cff)}
+  .g3{background:linear-gradient(135deg,#ffd166,#ff5ca8)}
+  .g4{background:linear-gradient(135deg,#3ddc97,#2de2e6)}
+
+  /* 拍摄页 */
+  .cam-wrap{position:relative;width:100%;aspect-ratio:3/4;border-radius:20px;overflow:hidden;background:#000;border:1px solid var(--line)}
+  video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  #fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+    background:conic-gradient(from 0deg,#241a4d,#3a1f5e,#102a3a,#241a4d);color:var(--sub);font-size:13px;padding:20px}
+  .ring-hint{position:absolute;top:10px;left:10px;font-size:11px;background:rgba(0,0,0,.45);padding:5px 9px;border-radius:12px;color:var(--c3)}
+  .filters{display:flex;gap:8px;overflow-x:auto;padding:12px 2px;margin-top:4px}
+  .filters::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;padding:8px 14px;border-radius:20px;font-size:12px;color:var(--sub);background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+  .chip.active{color:#fff;background:linear-gradient(90deg,var(--c1),var(--c2));border-color:transparent;font-weight:700}
+  .shutter{margin:14px auto 6px;width:74px;height:74px;border-radius:50%;background:linear-gradient(135deg,#fff,#dfe);border:5px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .shutter:active{transform:scale(.94)}
+  .shutter .dot{width:30px;height:30px;border-radius:50%;background:#fff}
+  .tip{text-align:center;font-size:11px;color:var(--sub);margin-top:2px}
+  .err{color:#ff8a8a;font-size:11px;text-align:center;min-height:14px;margin-top:6px}
+
+  /* 成片页 */
+  .filmstrip{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px}
+  .filmstrip::-webkit-scrollbar{display:none}
+  .thumb{flex:0 0 auto;width:84px;height:112px;border-radius:12px;object-fit:cover;border:1px solid var(--line)}
+  .empty{color:var(--sub);font-size:13px;text-align:center;padding:40px 10px}
+  .ai-btn{width:100%;padding:14px;border:none;border-radius:16px;color:#0b0b14;font-weight:800;font-size:15px;
+    background:linear-gradient(90deg,var(--c4),var(--c2));box-shadow:0 10px 30px rgba(255,92,168,.35);cursor:pointer;margin-top:8px}
+  .ai-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* 成片弹窗 */
+  .mask{position:absolute;inset:0;background:rgba(5,5,12,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:40;padding:18px}
+  .mask.show{display:flex}
+  .card{width:100%;max-width:340px;border-radius:22px;overflow:hidden;background:#11111f;border:1px solid var(--line);box-shadow:var(--shadow)}
+  .card .hero{width:100%;height:300px;object-fit:cover;background:#000}
+  .card .body{padding:14px}
+  .card .title{font-weight:800;font-size:16px;margin:0 0 4px}
+  .card .meta{font-size:12px;color:var(--sub);margin-bottom:10px}
+  .card .tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tag{font-size:11px;padding:4px 9px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--c3)}
+  .share-row{display:flex;gap:8px}
+  .share{flex:1;text-align:center;padding:10px 0;border-radius:13px;font-size:12px;font-weight:700;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;color:#fff}
+  .share:active{transform:scale(.97)}
+  .close{position:absolute;top:14px;right:16px;font-size:22px;color:#fff;cursor:pointer;z-index:50}
+
+  /* Toast */
+  .toast{position:absolute;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,.85);
+    color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .foot{padding:6px 14px 16px;color:var(--sub);font-size:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="device">
+    <div class="notch"></div>
+    <div class="brandbar">
+      <div class="brand"><span class="logo"></span>奇光 ColorSnap</div>
+      <span class="badge">Rokid Color · 全彩</span>
+    </div>
+    <div class="tabbar">
+      <div class="tab active" data-tab="discover">发现</div>
+      <div class="tab" data-tab="camera">拍摄</div>
+      <div class="tab" data-tab="film">成片</div>
+    </div>
+
+    <div class="view">
+      <!-- 发现 -->
+      <div class="page active" id="discover">
+        <h2>全彩瞬间 · 大家都在拍</h2>
+        <div class="feed">
+          <div class="shot g1"><span class="like">♥ 1.2k</span><span class="cap">西湖边的赛博黄昏</span></div>
+          <div class="shot g2"><span class="like">♥ 860</span><span class="cap">骑行第一视角</span></div>
+          <div class="shot g3"><span class="like">♥ 2.4k</span><span class="cap">霓虹夜市</span></div>
+          <div class="shot g4"><span class="like">♥ 540</span><span class="cap">阳台绿植日记</span></div>
+        </div>
+        <p class="muted" style="margin-top:14px">ColorSnap 是 Rokid Color 全彩 AI 内容社交应用：实时全彩 AR 滤镜 → 第一视角抓拍 → AI 一键成片 → 社交分享。</p>
+      </div>
+
+      <!-- 拍摄 -->
+      <div class="page" id="camera">
+        <div class="cam-wrap">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="canvas"></canvas>
+          <div id="fallback">正在请求摄像头…<br/>若未授权，将使用全彩演示背景</div>
+          <div class="ring-hint">Ring 微手势 / 空格 = 抓拍</div>
+        </div>
+        <div class="filters" id="filters">
+          <div class="chip active" data-f="none">原图</div>
+          <div class="chip" data-f="retro">复古胶片</div>
+          <div class="chip" data-f="neon">赛博霓虹</div>
+          <div class="chip" data-f="dream">梦幻渐变</div>
+          <div class="chip" data-f="anime">动漫风</div>
+          <div class="chip" data-f="dopa">多巴胺</div>
+        </div>
+        <div class="shutter" id="shutter"><div class="dot"></div></div>
+        <div class="tip">点击快门或用键盘空格 / ← → 模拟 Ring 微手势抓拍</div>
+        <div class="err" id="err"></div>
+      </div>
+
+      <!-- 成片 -->
+      <div class="page" id="film">
+        <h2>我的底片 <span class="muted" id="count">(0)</span></h2>
+        <div class="filmstrip" id="strip"></div>
+        <div class="empty" id="empty">还没有抓拍，去「拍摄」页拍几张全彩瞬间吧。</div>
+        <button class="ai-btn" id="aiBtn" disabled>✨ AI 一键成片</button>
+        <p class="muted" style="margin-top:10px">AI 自动完成：挑选最佳帧 · 自动字幕 · 配乐 · 全彩排版 → 生成可分享卡片。</p>
+      </div>
+    </div>
+
+    <div class="foot">奇光 ColorSnap · 演示原型（Web）｜ 原生版可导入 AIUI Studio 发布到乐奇智能体商店</div>
+
+    <!-- 成片弹窗 -->
+    <div class="mask" id="mask">
+      <span class="close" id="close">×</span>
+      <div class="card">
+        <img class="hero" id="hero" alt="成片"/>
+        <div class="body">
+          <p class="title" id="cTitle">我的全彩一日</p>
+          <p class="meta" id="cMeta">AI 成片 · 自动字幕 · 配乐 ♪ Lo-Fi Sunset</p>
+          <div class="tags">
+            <span class="tag">#RokidColor全彩</span><span class="tag">#第一视角</span><span class="tag">#AI成片</span>
+          </div>
+          <div class="share-row">
+            <div class="share" data-to="小红书">分享到小红书</div>
+            <div class="share" data-to="朋友圈">朋友圈</div>
+            <div class="share" data-to="微博">微博</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const video=document.getElementById('video');
+  const canvas=document.getElementById('canvas');
+  const fallback=document.getElementById('fallback');
+  const errEl=document.getElementById('err');
+  const ctx=canvas.getContext('2d');
+  let currentFilter='none', camOK=false, stream=null;
+  const shots=[];
+
+  // 滤镜参数（CSS filter + 叠加特效）
+  const FILTERS={
+    none:{css:'none',overlay:null},
+    retro:{css:'sepia(.5) contrast(1.1) saturate(1.2)',overlay:'retro'},
+    neon:{css:'saturate(1.8) contrast(1.2) hue-rotate(20deg)',overlay:'neon'},
+    dream:{css:'blur(.4px) saturate(1.6) brightness(1.05)',overlay:'dream'},
+    anime:{css:'contrast(1.25) saturate(1.7) brightness(1.1)',overlay:'anime'},
+    dopa:{css:'saturate(2) contrast(1.1)',overlay:'dopa'}
+  };
+
+  // 初始化摄像头（失败则用全彩动画背景）
+  async function initCam(){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+      video.srcObject=stream; camOK=true; fallback.style.display='none';
+      video.addEventListener('loadedmetadata',()=>{canvas.width=video.videoWidth;canvas.height=video.videoHeight;});
+    }catch(e){
+      camOK=false; fallback.style.display='flex';
+      fallback.textContent='未获得摄像头权限 · 使用全彩演示背景';
+      errEl.textContent='提示：在 https/localhost 下授权摄像头可体验真实第一视角';
+      startFallbackAnim();
+    }
+  }
+
+  // 无摄像头时的全彩流动背景
+  let t=0;
+  function startFallbackAnim(){
+    canvas.width=300;canvas.height=400;
+    (function loop(){
+      t+=0.02;
+      const g=ctx.createLinearGradient(0,0,canvas.width,canvas.height);
+      g.addColorStop(0,`hsl(${(t*40)%360},80%,60%)`);
+      g.addColorStop(.5,`hsl(${(t*40+120)%360},80%,55%)`);
+      g.addColorStop(1,`hsl(${(t*40+240)%360},80%,60%)`);
+      ctx.fillStyle=g;ctx.fillRect(0,0,canvas.width,canvas.height);
+      drawOverlay('dopa');
+      requestAnimationFrame(loop);
+    })();
+  }
+
+  // 全彩 AR 叠加特效
+  function drawOverlay(kind){
+    const w=canvas.width,h=canvas.height;
+    ctx.save();
+    if(kind==='neon'){
+      ctx.globalAlpha=.9;ctx.strokeStyle='#2de2e6';ctx.lineWidth=3;
+      ctx.strokeRect(14,14,w-28,h-28);
+      for(let i=0;i<6;i++){ctx.fillStyle='rgba(255,92,168,.8)';ctx.beginPath();ctx.arc(40+i*30,40,4,0,7);ctx.fill();}
+    }else if(kind==='retro'){
+      ctx.globalAlpha=.7;ctx.fillStyle='rgba(255,209,102,.9)';ctx.font='bold 22px sans-serif';
+      ctx.fillText('● REC',20,34);
+    }else if(kind==='dream'){
+      ctx.globalAlpha=.5;ctx.fillStyle='#fff';
+      for(let i=0;i<14;i++){ctx.beginPath();ctx.arc((i*53+t*60)%w,(i*71)%h,2+i%3,0,7);ctx.fill();}
+    }else if(kind==='anime'){
+      ctx.globalAlpha=.85;ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='16px sans-serif';
+      ctx.fillText('☆ 全彩瞬间',18,30);
+    }else if(kind==='dopa'){
+      ctx.globalAlpha=.6;const cols=['#ff5ca8','#ffd166','#2de2e6','#7c5cff'];
+      for(let i=0;i<10;i++){ctx.fillStyle=cols[i%4];ctx.beginPath();ctx.arc((i*37+t*40)%w,(i*61)%h,5,0,7);ctx.fill();}
+    }
+    ctx.restore();
+  }
+
+  // 实时把滤镜+叠加画到 canvas（摄像头模式）
+  function renderLoop(){
+    if(camOK && video.readyState>=2){
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.filter=FILTERS[currentFilter].css;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      ctx.filter='none';
+      drawOverlay(FILTERS[currentFilter].overlay);
+    }
+    requestAnimationFrame(renderLoop);
+  }
+
+  // 抓拍
+  function capture(){
+    const out=document.createElement('canvas');
+    out.width=canvas.width||300;out.height=canvas.height||400;
+    out.getContext('2d').drawImage(canvas,0,0);
+    shots.push(out.toDataURL('image/jpeg',0.85));
+    updateFilm(); toast('已抓拍一张全彩瞬间 📸');
+  }
+
+  // 更新成片页
+  function updateFilm(){
+    const strip=document.getElementById('strip');
+    const empty=document.getElementById('empty');
+    const aiBtn=document.getElementById('aiBtn');
+    const count=document.getElementById('count');
+    strip.innerHTML='';
+    count.textContent='('+shots.length+')';
+    if(shots.length===0){empty.style.display='block';aiBtn.disabled=true;return;}
+    empty.style.display='none';aiBtn.disabled=false;
+    shots.forEach(s=>{const img=document.createElement('img');img.src=s;img.className='thumb';strip.appendChild(img);});
+  }
+
+  // AI 一键成片
+  const CAPTIONS=['我的全彩一日','City Walk 全彩碎片','把黄昏装进眼镜','第一视角的小确幸','今天也是彩色的'];
+  function makeFilm(){
+    if(shots.length===0)return;
+    const hero=document.getElementById('hero');
+    // 选中间帧作为封面
+    hero.src=shots[Math.floor(shots.length/2)];
+    document.getElementById('cTitle').textContent=CAPTIONS[Math.floor(Math.random()*CAPTIONS.length)];
+    document.getElementById('mask').classList.add('show');
+  }
+
+  // Toast
+  let toastTimer;
+  function toast(msg){
+    const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+    clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1600);
+  }
+
+  // 事件绑定
+  document.getElementById('filters').addEventListener('click',e=>{
+    const c=e.target.closest('.chip');if(!c)return;
+    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');currentFilter=c.dataset.f;
+  });
+  document.getElementById('shutter').addEventListener('click',capture);
+  document.getElementById('aiBtn').addEventListener('click',makeFilm);
+  document.getElementById('close').addEventListener('click',()=>document.getElementById('mask').classList.remove('show'));
+  document.querySelectorAll('.share').forEach(b=>b.addEventListener('click',()=>toast('已生成分享卡片（演示）→ '+b.dataset.to)));
+  document.addEventListener('keydown',e=>{
+    if(e.code==='Space'){e.preventDefault();if(isTab('camera'))capture();}
+    if(e.code==='ArrowLeft'||e.code==='ArrowRight'){if(isTab('camera'))capture();}
+  });
+
+  // Tab 切换
+  function isTab(id){return document.getElementById(id).classList.contains('active');}
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');
+  }));
+
+  initCam();renderLoop();
+})();
+</script>
+</body>
+</html>

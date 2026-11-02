@@ -1,0 +1,9 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "奇光 ColorSnap",
+    "backgroundColor": "#0b0b14"
+  }
+}
