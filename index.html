@@ -77,6 +77,7 @@
   .card .hero{width:100%;height:300px;object-fit:cover;background:#000}
   .card .body{padding:14px}
   .card .title{font-weight:800;font-size:16px;margin:0 0 4px}
+  .card .subtitle{font-size:13px;color:var(--txt);margin:0 0 8px;line-height:1.4}
   .card .meta{font-size:12px;color:var(--sub);margin-bottom:10px}
   .card .tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
   .tag{font-size:11px;padding:4px 9px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--c3)}
@@ -159,6 +160,7 @@
         <img class="hero" id="hero" alt="成片"/>
         <div class="body">
           <p class="title" id="cTitle">我的全彩一日</p>
+          <p class="subtitle" id="cSub">傍晚 · 用 Rokid Color 抓拍的全彩瞬间</p>
           <p class="meta" id="cMeta">AI 成片 · 自动字幕 · 配乐 ♪ Lo-Fi Sunset</p>
           <div class="tags">
             <span class="tag">#RokidColor全彩</span><span class="tag">#第一视角</span><span class="tag">#AI成片</span>
@@ -261,12 +263,12 @@
     requestAnimationFrame(renderLoop);
   }
 
-  // 抓拍
+  // 抓拍（记录帧 + 当时滤镜，供 AI 成片分析）
   function capture(){
     const out=document.createElement('canvas');
     out.width=canvas.width||300;out.height=canvas.height||400;
     out.getContext('2d').drawImage(canvas,0,0);
-    shots.push(out.toDataURL('image/jpeg',0.85));
+    shots.push({src:out.toDataURL('image/jpeg',0.85),filter:currentFilter});
     updateFilm(); toast('已抓拍一张全彩瞬间 📸');
   }
 
@@ -280,18 +282,67 @@
     count.textContent='('+shots.length+')';
     if(shots.length===0){empty.style.display='block';aiBtn.disabled=true;return;}
     empty.style.display='none';aiBtn.disabled=false;
-    shots.forEach(s=>{const img=document.createElement('img');img.src=s;img.className='thumb';strip.appendChild(img);});
+    shots.forEach(s=>{const img=document.createElement('img');img.src=s.src;img.className='thumb';strip.appendChild(img);});
   }
 
-  // AI 一键成片
-  const CAPTIONS=['我的全彩一日','City Walk 全彩碎片','把黄昏装进眼镜','第一视角的小确幸','今天也是彩色的'];
+  // ===== 真实 AI 成片逻辑（上下文驱动） =====
+  // 配乐：按主滤镜情绪自动匹配
+  const MUSIC={
+    none :{name:'Lo-Fi Sunset',mood:'极简松弛'},
+    retro:{name:'Retro City',mood:'复古 CityPop'},
+    neon :{name:'Neon Drive',mood:'赛博电子'},
+    dream:{name:'Dream Pop',mood:'梦幻流行'},
+    anime:{name:'Anime Vibes',mood:'日系轻音'},
+    dopa :{name:'Dopa Beats',mood:'活力舞曲'}
+  };
+  // 标题库（按滤镜分组，结合张数取位）
+  const TITLES={
+    none :['把今天装进眼镜','第一视角的小确幸','今天也是彩色的'],
+    retro:['旧时光的暖调','像一张泛黄明信片','胶片里的午后'],
+    neon :['夜色里的赛博诗','霓虹是我给夜的注脚','城市脉冲'],
+    dream:['做了一个彩色的梦','云朵掉进了镜头','微光与软糖'],
+    anime:['像动画里的那一帧','夏日番的片尾','全彩的二次元'],
+    dopa :['把快乐调成满格','多巴胺炸开的下午','高饱和的一天']
+  };
+  // 字幕：结合时段 + 张数，模拟 LLM 生成的成片旁白
+  function pickSubtitle(hour,count){
+    let when='午后';
+    if(hour<6)when='凌晨';else if(hour<11)when='清晨';
+    else if(hour<14)when='正午';else if(hour<18)when='傍晚';
+    else if(hour<22)when='夜晚';else when='深夜';
+    return where+' · 用 Rokid Color 抓拍的 '+count+' 个全彩瞬间';
+  }
+  function pickTitle(dom,count){
+    const list=TITLES[dom]||TITLES.none;
+    return list[count%list.length];
+  }
+  // 聚合上下文 → 标题/字幕/配乐（与 AIUI 端 LanguageModel 逻辑一致；网页端用本地启发式，真机走模型）
+  function aiCompose(){
+    const count=shots.length;
+    const filters=[...new Set(shots.map(s=>s.filter))];
+    const dom=filters[0];
+    const hour=new Date().getHours();
+    return {
+      cap:pickTitle(dom,count),
+      sub:pickSubtitle(hour,count),
+      music:MUSIC[dom]||MUSIC.none
+    };
+  }
+  // AI 一键成片（带生成态）
   function makeFilm(){
     if(shots.length===0)return;
-    const hero=document.getElementById('hero');
-    // 选中间帧作为封面
-    hero.src=shots[Math.floor(shots.length/2)];
-    document.getElementById('cTitle').textContent=CAPTIONS[Math.floor(Math.random()*CAPTIONS.length)];
-    document.getElementById('mask').classList.add('show');
+    const btn=document.getElementById('aiBtn');
+    btn.disabled=true;btn.textContent='AI 生成中…';
+    // 模拟模型调用延迟；真机此处为 LanguageModel.create().prompt()
+    setTimeout(()=>{
+      const {cap,sub,music}=aiCompose();
+      document.getElementById('hero').src=shots[Math.floor(shots.length/2)].src;
+      document.getElementById('cTitle').textContent=cap;
+      document.getElementById('cSub').textContent=sub;
+      document.getElementById('cMeta').textContent='AI 成片 · ♪ '+music.name+' · '+music.mood;
+      btn.disabled=false;btn.textContent='✨ AI 一键成片';
+      document.getElementById('mask').classList.add('show');
+    },700);
   }
 
   // Toast

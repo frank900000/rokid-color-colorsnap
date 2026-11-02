@@ -18,6 +18,7 @@ export default {
     currentFilter: 'none',
     shots: [],
     film: null,
+    generating: false,
     hint: 'Ring 单击或点按快门，抓拍你的全彩瞬间'
   },
 
@@ -40,25 +41,102 @@ export default {
     });
   },
 
-  // AI 一键成片：挑选最佳帧 + 自动字幕 + 配乐 + 全彩排版
-  makeFilm() {
+  // AI 一键成片：真实 LanguageModel 生成字幕 + 按情绪自动配乐（能力不可用时本地启发式兜底）
+  async makeFilm() {
     if (this.data.shots.length === 0) {
       this.setData({ hint: '还没有底片，先抓拍几张吧' });
       return;
     }
-    const captions = ['我的全彩一日', 'City Walk 全彩碎片', '把黄昏装进眼镜', '第一视角的小确幸', '今天也是彩色的'];
-    const cover = this.data.shots[Math.floor(this.data.shots.length / 2)];
-    const caption = captions[Math.floor(Math.random() * captions.length)];
+    this.setData({ generating: true, hint: 'AI 正在生成字幕与配乐…' });
+
+    const shots = this.data.shots;
+    const cover = shots[Math.floor(shots.length / 2)];
+    const filtersUsed = [];
+    shots.forEach(function (s) { if (filtersUsed.indexOf(s.filter) < 0) filtersUsed.push(s.filter); });
+    const ctx = { count: shots.length, filters: filtersUsed, hour: new Date().getHours() };
+
+    let caption = '';
+    let subtitle = '';
+    try {
+      const status = await LanguageModel.availability();
+      if (status === 'available') {
+        const session = await LanguageModel.create({
+          initialPrompts: [{
+            role: 'system',
+            content: '你是 Rokid Color 双目全彩眼镜的第一视角 Vlog AI 剪辑师，擅长用极短中文写出有画面感的成片标题与字幕。'
+          }]
+        });
+        const raw = await session.prompt(
+          '我抓拍了 ' + ctx.count + ' 张第一视角照片，用了这些滤镜：' + ctx.filters.join('、') +
+          '。请给我两行：第一行为不超过 12 字的中文标题；第二行为不超过 20 字的中文字幕。只输出这两行，不要解释。'
+        );
+        const lines = String(raw).split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+        caption = lines[0] || this.fallbackCaption(ctx);
+        subtitle = lines[1] || this.fallbackSubtitle(ctx);
+        if (session && session.destroy) { try { session.destroy(); } catch (e) {} }
+      } else {
+        caption = this.fallbackCaption(ctx);
+        subtitle = this.fallbackSubtitle(ctx);
+      }
+    } catch (e) {
+      caption = this.fallbackCaption(ctx);
+      subtitle = this.fallbackSubtitle(ctx);
+    }
+
+    const music = this.pickMusic(cover.filter);
     this.setData({
+      generating: false,
       film: {
         coverFilter: cover.filter,
         caption: caption,
-        music: 'Lo-Fi Sunset',
+        subtitle: subtitle,
+        music: music.name,
+        mood: music.mood,
         tags: ['#RokidColor全彩', '#第一视角', '#AI成片'],
         sharedTo: ''
       },
       hint: 'AI 成片完成，确认后可分享'
     });
+  },
+
+  // 配乐：按主滤镜情绪自动匹配
+  pickMusic(filter) {
+    const map = {
+      none:  { name: 'Lo-Fi Sunset', mood: '极简松弛' },
+      retro: { name: 'Retro City',   mood: '复古 CityPop' },
+      neon:  { name: 'Neon Drive',   mood: '赛博电子' },
+      dream: { name: 'Dream Pop',    mood: '梦幻流行' },
+      anime: { name: 'Anime Vibes',  mood: '日系轻音' },
+      dopa:  { name: 'Dopa Beats',  mood: '活力舞曲' }
+    };
+    return map[filter] || map.none;
+  },
+
+  // 本地兜底标题（模型不可用时）
+  fallbackCaption(ctx) {
+    const titles = {
+      none:  ['把今天装进眼镜', '第一视角的小确幸', '今天也是彩色的'],
+      retro: ['旧时光的暖调', '像一张泛黄明信片'],
+      neon:  ['夜色里的赛博诗', '霓虹是我给夜的注脚'],
+      dream: ['做了一个彩色的梦', '云朵掉进了镜头'],
+      anime: ['像动画里的那一帧', '夏日番的片尾'],
+      dopa:  ['把快乐调成满格', '多巴胺炸开的下午']
+    };
+    const list = titles[ctx.filters[0]] || titles.none;
+    return list[ctx.count % list.length];
+  },
+
+  // 本地兜底字幕（结合时段 + 张数）
+  fallbackSubtitle(ctx) {
+    let when = '午后';
+    const h = ctx.hour;
+    if (h < 6) when = '凌晨';
+    else if (h < 11) when = '清晨';
+    else if (h < 14) when = '正午';
+    else if (h < 18) when = '傍晚';
+    else if (h < 22) when = '夜晚';
+    else when = '深夜';
+    return when + ' · 用 Rokid Color 抓拍的 ' + ctx.count + ' 个全彩瞬间';
   },
 
   // 生成分享卡片（需用户确认）
@@ -73,7 +151,7 @@ export default {
 
   // 清空重来
   reset() {
-    this.setData({ shots: [], film: null, hint: '已清空，重新开始创作' });
+    this.setData({ shots: [], film: null, generating: false, hint: '已清空，重新开始创作' });
   }
 }
 </script>
@@ -105,7 +183,9 @@ export default {
 
     <!-- 操作 -->
     <button class="shutter" bindtap="capture">📸 抓拍</button>
-    <button class="ai-btn" disabled="{{shots.length === 0}}" bindtap="makeFilm">✨ AI 一键成片</button>
+    <button class="ai-btn" disabled="{{shots.length === 0 || generating}}" bindtap="makeFilm">
+      {{ generating ? 'AI 生成中…' : '✨ AI 一键成片' }}
+    </button>
     <button class="reset-btn" bindtap="reset">清空重来</button>
 
     <text class="hint">{{hint}}</text>
@@ -114,8 +194,9 @@ export default {
     <view class="mask" wx:if="{{film}}">
       <view class="hero hero-{{film.coverFilter}}">
         <text class="hero-cap">{{film.caption}}</text>
+        <text class="hero-sub">{{film.subtitle}}</text>
       </view>
-      <text class="meta">AI 成片 · ♪ {{film.music}}</text>
+      <text class="meta">AI 成片 · ♪ {{film.music}} · {{film.mood}}</text>
       <view class="tags">
         <text wx:for="{{film.tags}}" wx:key="*this" class="tag">{{item}}</text>
       </view>
@@ -153,7 +234,7 @@ export default {
 
 /* 全彩滤镜预览（不同滤镜对应不同色偏，模拟 AR 叠加） */
 .cam-none  { background: linear-gradient(135deg, #2a2a40, #0b0b14); }
-.cam-retro { background: linear-gradient(135deg, #6b4a2b, #2a1c10); filter: sepia(.4); }
+.cam-retro { background: linear-gradient(135deg, #6b4a2b, #2a1c10); }
 .cam-neon  { background: linear-gradient(135deg, #00e5ff, #ff2bd6); }
 .cam-dream { background: linear-gradient(135deg, #ffb6e6, #b6c8ff); }
 .cam-anime { background: linear-gradient(135deg, #1fa2ff, #12d8b8); }
@@ -188,14 +269,15 @@ export default {
 .hint { font-size: 22rpx; color: #2de2e6; margin: 12rpx 4rpx; min-height: 30rpx; }
 
 .mask { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(5,5,12,.8); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32rpx; }
-.hero { width: 520rpx; height: 640rpx; border-radius: 24rpx; display: flex; align-items: flex-end; padding: 24rpx; }
+.hero { width: 520rpx; height: 640rpx; border-radius: 24rpx; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; padding: 24rpx; }
 .hero-none  { background: linear-gradient(135deg, #2a2a40, #0b0b14); }
 .hero-retro { background: linear-gradient(135deg, #6b4a2b, #2a1c10); }
 .hero-neon  { background: linear-gradient(135deg, #00e5ff, #ff2bd6); }
 .hero-dream { background: linear-gradient(135deg, #ffb6e6, #b6c8ff); }
 .hero-anime { background: linear-gradient(135deg, #1fa2ff, #12d8b8); }
 .hero-dopa  { background: linear-gradient(135deg, #ff5ca8, #ffd166, #2de2e6); }
-.hero-cap { color: #fff; font-size: 34rpx; font-weight: 800; text-shadow: 0 2rpx 8rpx rgba(0,0,0,.6); }
+.hero-cap { color: #fff; font-size: 38rpx; font-weight: 800; text-shadow: 0 2rpx 8rpx rgba(0,0,0,.6); }
+.hero-sub { color: rgba(255,255,255,.92); font-size: 24rpx; margin-top: 8rpx; text-shadow: 0 2rpx 6rpx rgba(0,0,0,.6); }
 .meta { font-size: 22rpx; color: #a9a9c4; margin: 16rpx 0 8rpx; }
 .tags { display: flex; flex-wrap: wrap; justify-content: center; }
 .tag { font-size: 20rpx; color: #2de2e6; margin: 6rpx; padding: 4rpx 12rpx; border: 1rpx solid rgba(45,226,230,.4); border-radius: 14rpx; }

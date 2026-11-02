@@ -5,7 +5,8 @@
 
 ## 当前状态（已用官方工具验证）
 - ✅ 工程已按 AIUI 官方 **Ink SFC 四段式**（`app.json` / `app.js` / `AGENTS.md` / `pages/index/index.ink`）重写。
-- ✅ 用官方 **AIX CLI `aix pack`** 静态打包成功，产物 `colorsnap.aix`（无报错，7 个源文件全部正确收集）。
+- ✅ **真实 AI 成片逻辑已接入**：`makeFilm()` 调用眼镜端 `LanguageModel.availability() → create() → prompt()`，依据滤镜 / 张数 / 时段生成标题与字幕；能力不可用时（网页模拟器 / 无网）自动回落本地启发式；配乐按主滤镜情绪自动匹配。
+- ✅ 用官方 **AIX CLI `aix pack`** 静态打包成功，产物 `colorsnap.aix`（无报错，源文件全部正确收集）。
 - ✅ `aix show` 解析出合法智能体定义（schemaVersion 1）。
 - ⚠️ **"提交审核"这一步必须由你本人在浏览器完成**：AIUI Studio 是网页端平台，需登录你的乐奇开发者账号，并经过真机验证与人工审核，我无法代为点击。下方给出逐条可照做的操作。
 
